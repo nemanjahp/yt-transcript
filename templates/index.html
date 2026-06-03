@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT Transkript — Izvuci i prevedi YouTube titlove</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0b0e;
+  --surface: #131520;
+  --surface-2: #1a1d2e;
+  --border: #252840;
+  --accent: #6c8aff;
+  --accent-glow: rgba(108, 138, 255, 0.15);
+  --accent-bright: #8aa2ff;
+  --text: #b0b8d1;
+  --text-dim: #5c6280;
+  --white: #e8ecf4;
+  --red: #ff6b6b;
+  --green: #6bffb8;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-size: 14px;
+  --radius: 10px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+/* ── Background grid effect ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(108, 138, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(108, 138, 255, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page { position: relative; z-index: 1; }
+
+/* ── LANDING SCREEN ── */
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+  transition: opacity 0.4s, transform 0.4s;
+}
+
+.landing.hidden {
+  opacity: 0;
+  transform: translateY(-20px);
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+}
+
+.logo {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 32px;
+  opacity: 0.7;
+}
+
+.landing h1 {
+  font-family: var(--font-body);
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 700;
+  color: var(--white);
+  text-align: center;
+  line-height: 1.15;
+  margin-bottom: 12px;
+}
+
+.landing h1 span {
+  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--text-dim);
+  text-align: center;
+  max-width: 460px;
+  margin-bottom: 48px;
+  line-height: 1.6;
+}
+
+.input-group {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  max-width: 600px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.input-group:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.input-group input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 16px 20px;
+  color: var(--white);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  outline: none;
+}
+
+.input-group input::placeholder { color: var(--text-dim); }
+
+.input-group button {
+  background: var(--accent);
+  border: none;
+  padding: 16px 28px;
+  color: #000;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.input-group button:hover { background: var(--accent-bright); }
+.input-group button:disabled { opacity: 0.5; cursor: wait; }
+
+.error-msg {
+  margin-top: 16px;
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  min-height: 20px;
+}
+
+.features {
+  display: flex;
+  gap: 40px;
+  margin-top: 64px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.feature {
+  text-align: center;
+  max-width: 180px;
+}
+
+.feature-icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.feature h3 {
+  font-size: 13px;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+
+.feature p {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ── RESULT SCREEN ── */
+.result {
+  display: none;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.result.active {
+  display: flex;
+}
+
+/* Top bar */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.back-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.video-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  flex: 1;
+  min-width: 0;
+}
+
+.video-badge span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.word-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* Controls bar */
+.controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.controls-bar select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--white);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.translate-btn {
+  background: var(--accent);
+  border: none;
+  padding: 8px 20px;
+  color: #000;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.translate-btn:hover { background: var(--accent-bright); }
+.translate-btn:disabled { opacity: 0.5; cursor: wait; }
+
+.translate-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.font-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.font-ctrl span {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.font-ctrl input[type="range"] {
+  -webkit-appearance: none;
+  width: 80px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+
+.font-ctrl input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+/* Panels */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  min-height: 0;
+}
+
+.panel:last-child { border-right: none; }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.copy-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+.copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.seg {
+  padding: 8px 10px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+  line-height: 1.7;
+  font-size: var(--font-size);
+  transition: background 0.2s;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+}
+
+.seg:hover { background: rgba(255,255,255,0.03); }
+.seg.active { background: var(--accent-glow); border-left-color: var(--accent); }
+
+.seg .ts {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-right: 8px;
+}
+
+.empty-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* ── Loading spinner ── */
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .panels { grid-template-columns: 1fr; }
+  .panel { border-right: none; border-bottom: 1px solid var(--border); }
+  .panel-body { max-height: 45vh; }
+  .features { gap: 24px; }
+  .controls-bar { gap: 8px; }
+  .font-ctrl { display: none; }
+  .top-bar { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══ LANDING ═══ -->
+  <div class="landing" id="landing">
+    <div class="logo">yt transkript</div>
+    <h1>YouTube transkript<br>i <span>sinhroni prevod</span></h1>
+    <p class="subtitle">Nalepi YouTube link — dobićeš transkript sa tajmkodovima i prevod na jezik po izboru, rečenicu po rečenicu.</p>
+
+    <div class="input-group">
+      <input type="text" id="urlInput" placeholder="https://youtube.com/watch?v=..." autofocus
+             onkeydown="if(event.key==='Enter') fetchTranscript()">
+      <button id="fetchBtn" onclick="fetchTranscript()">IZVUCI</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">📝</div>
+        <h3>Transkript</h3>
+        <p>Automatski titlovi sa tajmkodovima</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🌍</div>
+        <h3>Prevod</h3>
+        <p>6 jezika, rečenicu po rečenicu</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📋</div>
+        <h3>Kopiranje</h3>
+        <p>Jedan klik — tekst u clipboard</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RESULT ═══ -->
+  <div class="result" id="result">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goBack()">← Nazad</button>
+      <div class="video-badge">
+        <span id="videoUrl"></span>
+      </div>
+      <div class="word-count" id="wordCount"></div>
+    </div>
+
+    <div class="controls-bar">
+      <select id="langSelect">
+        <option value="sr">Prevedi → Srpski</option>
+        <option value="en">Prevedi → Engleski</option>
+        <option value="ru">Prevedi → Ruski</option>
+        <option value="de">Prevedi → Nemački</option>
+        <option value="fr">Prevedi → Francuski</option>
+        <option value="es">Prevedi → Španski</option>
+      </select>
+      <button class="translate-btn" id="translateBtn" onclick="translateAll()">PREVEDI</button>
+      <span class="translate-status" id="translateStatus"></span>
+      <div class="font-ctrl">
+        <span>A</span>
+        <input type="range" min="11" max="22" value="14"
+               oninput="document.documentElement.style.setProperty('--font-size', this.value+'px')">
+        <span style="font-size:14px">A</span>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Original</span>
+          <button class="copy-btn" onclick="copyPanel('left', this)">Kopiraj</button>
+        </div>
+        <div class="panel-body" id="leftPanel"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Prevod</span>
+          <button class="copy-btn" onclick="copyPanel('right', this)">Kopiraj</button>
+        </div>
+        <div class="panel-body" id="rightPanel">
+          <div class="empty-panel">← Izaberi jezik i klikni PREVEDI</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let transcriptData = null;
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+async function fetchTranscript() {
+  const url = document.getElementById('urlInput').value.trim();
+  const btn = document.getElementById('fetchBtn');
+  const err = document.getElementById('errorMsg');
+
+  if (!url) { err.textContent = 'Unesi YouTube URL.'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Učitavam...';
+  err.textContent = '';
+
+  try {
+    const res = await fetch('/api/transcript', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      err.textContent = data.error || 'Greška.';
+      return;
+    }
+
+    transcriptData = data;
+    showResult(data);
+  } catch (e) {
+    err.textContent = 'Mrežna greška. Pokušaj ponovo.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'IZVUCI';
+  }
+}
+
+function showResult(data) {
+  document.getElementById('landing').classList.add('hidden');
+  document.getElementById('result').classList.add('active');
+  document.getElementById('videoUrl').textContent = data.url;
+
+  const words = data.text.split(/\s+/).length;
+  document.getElementById('wordCount').textContent = words + ' reči · ' + (data.language || '?');
+
+  const left = document.getElementById('leftPanel');
+  left.innerHTML = '';
+
+  // Group segments into sentence-like chunks
+  const segments = data.segments || [];
+  let chunks = [];
+  let buffer = '';
+  let bufStart = 0;
+
+  for (const seg of segments) {
+    if (!buffer) bufStart = seg.start;
+    buffer += (buffer ? ' ' : '') + seg.text;
+    if (/[.!?]/.test(seg.text.slice(-1)) || buffer.length > 200) {
+      chunks.push({ text: buffer.trim(), start: bufStart });
+      buffer = '';
+    }
+  }
+  if (buffer.trim()) chunks.push({ text: buffer.trim(), start: bufStart });
+
+  // If no segments, just split the text
+  if (chunks.length === 0 && data.text) {
+    const sentences = data.text.match(/[^.!?]+[.!?]+/g) || [data.text];
+    chunks = sentences.map((s, i) => ({ text: s.trim(), start: 0 }));
+  }
+
+  window._chunks = chunks;
+
+  chunks.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'seg';
+    div.id = 'L-' + i;
+    div.innerHTML = '<span class="ts">' + formatTime(c.start) + '</span>' + escHtml(c.text);
+    div.onclick = () => highlightPair(i);
+    left.appendChild(div);
+  });
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function highlightPair(i) {
+  document.querySelectorAll('.seg.active').forEach(el => el.classList.remove('active'));
+  const l = document.getElementById('L-' + i);
+  const r = document.getElementById('R-' + i);
+  if (l) { l.classList.add('active'); l.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  if (r) { r.classList.add('active'); r.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+
+async function translateAll() {
+  const chunks = window._chunks;
+  if (!chunks || !chunks.length) return;
+
+  const lang = document.getElementById('langSelect').value;
+  const btn = document.getElementById('translateBtn');
+  const status = document.getElementById('translateStatus');
+  const right = document.getElementById('rightPanel');
+
+  btn.disabled = true;
+  right.innerHTML = '';
+
+  for (let i = 0; i < chunks.length; i++) {
+    status.textContent = (i + 1) + ' / ' + chunks.length;
+    const text = chunks[i].text;
+
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${lang}&dt=t&q=${encodeURIComponent(text)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const translated = data[0].map(s => s[0]).join('');
+
+      const div = document.createElement('div');
+      div.className = 'seg';
+      div.id = 'R-' + i;
+      div.innerHTML = '<span class="ts">' + formatTime(chunks[i].start) + '</span>' + escHtml(translated);
+      div.onclick = () => highlightPair(i);
+      right.appendChild(div);
+    } catch (e) {
+      const div = document.createElement('div');
+      div.className = 'seg';
+      div.id = 'R-' + i;
+      div.textContent = '[Greška pri prevodu]';
+      right.appendChild(div);
+    }
+  }
+
+  status.textContent = '✓ Gotovo';
+  btn.disabled = false;
+}
+
+function copyPanel(side, btnEl) {
+  const panelId = side === 'left' ? 'leftPanel' : 'rightPanel';
+  const segs = document.querySelectorAll('#' + panelId + ' .seg');
+  const text = Array.from(segs).map(s => {
+    // Get text content without the timestamp
+    const clone = s.cloneNode(true);
+    const ts = clone.querySelector('.ts');
+    if (ts) ts.remove();
+    return clone.textContent.trim();
+  }).join('\n\n');
+
+  navigator.clipboard.writeText(text).then(() => {
+    btnEl.classList.add('copied');
+    btnEl.textContent = '✓ Kopirano';
+    setTimeout(() => { btnEl.classList.remove('copied'); btnEl.textContent = 'Kopiraj'; }, 2000);
+  });
+}
+
+function goBack() {
+  document.getElementById('result').classList.remove('active');
+  document.getElementById('landing').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
